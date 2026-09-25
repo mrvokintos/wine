@@ -27,7 +27,7 @@ permissions:
   contents: read
 env:
   WINE_VERSION: '11.0'
-  REVISION: '12-experimental'
+  REVISION: '13-experimental'
   RELEASE_CODENAME: 'Windows Escape'
   WINE_TKG_COMMIT: '04ddf86c96817d2f8bb45aefc04c9ad3871ca740'
   VALVE_WINE_TAG: 'experimental-wine-bleeding-edge-11.0-428201-20260904-pdf1645-w0509a0-dd7ac25-v35bdee'
@@ -45,18 +45,19 @@ env:
 
     This is a Wine TKG build based on Valve's Wine (experimental bleeding edge) source code.
 
-    Soda 11.0-12 Experimental, codenamed Windows Escape, updates the Office authentication broker. It remains a prerelease and does not replace the current stable Soda build.
+    Soda 11.0-13 Experimental, codenamed Windows Escape, improves Click-to-Run component discovery for Office. It remains a prerelease and does not replace the current stable Soda build.
 
     - Added experimental Microsoft Office 365 support for Click-to-Run installation, activation, Word, Excel, PowerPoint, OneNote, and classic Outlook.
     - Added the WinRT APIs used by Office for accounts, application data, package queries, system identity, globalization, networking, HTTP, JSON, media, and input.
     - Fixed resource-scoped Office tokens used after Microsoft sign-in.
     - Renamed the Office authentication broker so older injected copies cannot shadow the runner implementation.
+    - Resolved published Office Click-to-Run components from all installed manifests, including Office MUI, for MSI component and qualifier queries.
     - Fixed Direct2D and DirectComposition paths used by Office, WebView2, and composition swap chains.
     - Fixed Wayland child surfaces, tool popups, focus input, disabled overlays, monitor placement, and cross-process WebView2 windows.
     - Fixed X11 popup presentation and Office font rendering.
     - Added standard accessibility proxies and expanded UI Automation support used by Office controls.
     - Fixed Click-to-Run MSI registration, software licensing calls, print preview, HTTP redirects and request options, and large XML documents.
-    - Kept the Soda 11.0-10 compatibility fixes, MS-ICU runtime, Adaptive Launch, host OpenXR, pure 32-bit prefixes, x86_64 PGO, and aarch64 support.
+    - Kept the Soda 11.0-10 compatibility fixes, MS-ICU runtime, Adaptive Launch, host OpenXR, pure 32-bit prefixes, and aarch64 support.
     - Built both packages in GitHub Actions from the pinned Wine, Proton, and Wine-TKG revisions.
 jobs:
   patches:
@@ -104,7 +105,6 @@ jobs:
           publish=false
           prerelease=false
           if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF" == "refs/heads/soda" ]]; then
-            pgo=true
             publish=true
             if [[ "$REVISION" == *-experimental ]]; then
               prerelease=true
