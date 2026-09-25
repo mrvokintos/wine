@@ -1,0 +1,104 @@
+Resolve Office C2R published components in MSI queries.
+
+diff --git a/dlls/msi/registry.c b/dlls/msi/registry.c
+--- a/dlls/msi/registry.c
++++ b/dlls/msi/registry.c
+@@ -558,6 +558,12 @@
+         id = c2r_xml_attribute_range( start, end, L"ComponentId" );
+         found = id && !wcsicmp( id, component );
+         free( id );
++        if (!found)
++        {
++            id = c2r_xml_attribute_range( start, end, L"PublishComponentId" );
++            found = id && !wcsicmp( id, component );
++            free( id );
++        }
+         if (found) return TRUE;
+         start = end + 1;
+     }
+@@ -677,9 +683,9 @@
+     if (found_qualifier) *found_qualifier = NULL;
+     if (key_path) *key_path = NULL;
+     len = wcslen( installation ) +
+-          wcslen( L"\\root\\Integration\\C2RManifest.Proof.Culture.msi.16.*.xml" ) + 1;
++          wcslen( L"\\root\\Integration\\C2RManifest.*.xml" ) + 1;
+     if (!(pattern = malloc( len * sizeof(WCHAR) ))) return FALSE;
+-    swprintf( pattern, len, L"%s\\root\\Integration\\C2RManifest.Proof.Culture.msi.16.*.xml",
++    swprintf( pattern, len, L"%s\\root\\Integration\\C2RManifest.*.xml",
+               installation );
+     if ((find = FindFirstFileW( pattern, &data )) == INVALID_HANDLE_VALUE)
+     {
+diff --git a/dlls/msi/tests/msi.c b/dlls/msi/tests/msi.c
+--- a/dlls/msi/tests/msi.c
++++ b/dlls/msi/tests/msi.c
+@@ -3510,9 +3510,12 @@
+     static const WCHAR grammar_data[] = L"{C9A7733D-5B0C-4B9F-B42E-8143FC77F881}";
+     static const WCHAR proof_data[] = L"{13462384-2D94-43AD-BA1E-687A27298820}";
+     static const WCHAR excel_component[] = L"{C4ACE6DB-AA99-401F-8BE6-8784BD09F003}";
++    static const WCHAR published_excel_component[] = L"{5812C571-53F0-4467-BEFA-0A4F47A9437C}";
++    static const WCHAR mui_component[] = L"{27E507A1-383D-4951-90D0-0D023EE7CFA1}";
+     static const WCHAR invalid_component[] = L"{D5BDF7EC-30C8-4CB8-943D-1B2A8811C151}";
+     static const WCHAR unknown_component[] = L"{2A3A2754-8C63-47A7-ADE9-2905E7627480}";
+     static const WCHAR excel_product[] = L"{90160000-000F-0000-1000-0000000FF1CE}";
++    static const WCHAR mui_product[] = L"{90160000-006E-0419-1000-0000000FF1CE}";
+     static const WCHAR product_en[] = L"{90160000-001F-0409-1000-0000000FF1CE}";
+     static const WCHAR product_it[] = L"{90160000-001F-0410-1000-0000000FF1CE}";
+     static const WCHAR manifest_en[] =
+@@ -3547,6 +3550,12 @@
+         L"PublishComponentId=\"{5812C571-53F0-4467-BEFA-0A4F47A9437C}\" "
+         L"ComponentId=\"{C4ACE6DB-AA99-401F-8BE6-8784BD09F003}\" "
+         L"Qualifier=\"excel.exe\"/></PublishComponentList></Package>";
++    static const WCHAR manifest_mui[] =
++        L"\xfeff<Package ProductCode=\"{90160000-006E-0419-1000-0000000FF1CE}\">"
++        L"<Component ComponentId=\"{D8630E32-87BB-419C-993D-96883F0E56E7}\" "
++        L"KeyPath=\"%SFT_PROGRAM_FILES_COMMON_X64%\\Microsoft Shared\\OFFICE16\\1049\\MSOINTL.DLL\">"
++        L"<PublishComponent PublishComponentId=\"{27E507A1-383D-4951-90D0-0D023EE7CFA1}\" "
++        L"Qualifier=\"x64\\1049\"/></Component></Package>";
+     static const WCHAR manifest_invalid[] =
+         L"\xfeff<Package ProductCode=\"invalid\"><PublishComponentList>"
+         L"<PublishComponent ComponentId=\"{D5BDF7EC-30C8-4CB8-943D-1B2A8811C151}\"/>"
+@@ -3599,6 +3608,8 @@
+     ok(write_wide_file(path, manifest_it), "failed to create Italian manifest\n");
+     swprintf(path, ARRAY_SIZE(path), L"%s\\root\\Integration\\C2RManifest.Excel.Excel.x-none.msi.16.x-none.xml", root);
+     ok(write_wide_file(path, manifest_excel), "failed to create Excel manifest\n");
++    swprintf(path, ARRAY_SIZE(path), L"%s\\root\\Integration\\C2RManifest.officemui.msi.16.ru-ru.xml", root);
++    ok(write_wide_file(path, manifest_mui), "failed to create Office MUI manifest\n");
+     swprintf(path, ARRAY_SIZE(path), L"%s\\root\\Integration\\C2RManifest.Invalid.xml", root);
+     ok(write_wide_file(path, manifest_invalid), "failed to create invalid manifest\n");
+     swprintf(path, ARRAY_SIZE(path), L"%s\\root\\Office16\\PROOF\\MSSP7EN.LEX", root);
+@@ -3640,6 +3651,14 @@
+     ok(r == ERROR_SUCCESS, "got %u\n", r);
+     ok(!lstrcmpW(path, excel_product), "got %s\n", debugstr_w(path));
+     lstrcpyW(path, L"unchanged");
++    r = MsiGetProductCodeW(published_excel_component, path);
++    ok(r == ERROR_SUCCESS, "got %u\n", r);
++    ok(!lstrcmpW(path, excel_product), "got %s\n", debugstr_w(path));
++    lstrcpyW(path, L"unchanged");
++    r = MsiGetProductCodeW(mui_component, path);
++    ok(r == ERROR_SUCCESS, "got %u\n", r);
++    ok(!lstrcmpW(path, mui_product), "got %s\n", debugstr_w(path));
++    lstrcpyW(path, L"unchanged");
+     r = MsiGetProductCodeW(invalid_component, path);
+     ok(r == ERROR_UNKNOWN_COMPONENT, "got %u\n", r);
+     ok(!lstrcmpW(path, L"unchanged"), "got %s\n", debugstr_w(path));
+@@ -3651,6 +3670,11 @@
+     r = MsiEnumComponentQualifiersW(proofing, 0, qualifier, &qualifier_size, appdata, &appdata_size);
+     ok(r == ERROR_SUCCESS, "got %u\n", r);
+     ok(!lstrcmpW(qualifier, L"1033"), "got %s\n", debugstr_w(qualifier));
++    qualifier_size = ARRAY_SIZE(qualifier);
++    appdata_size = ARRAY_SIZE(appdata);
++    r = MsiEnumComponentQualifiersW(mui_component, 0, qualifier, &qualifier_size, appdata, &appdata_size);
++    ok(r == ERROR_SUCCESS, "got %u\n", r);
++    ok(!lstrcmpW(qualifier, L"x64\\1049"), "got %s\n", debugstr_w(qualifier));
+     qualifier_size = ARRAY_SIZE(qualifier);
+     appdata_size = ARRAY_SIZE(appdata);
+     r = MsiEnumComponentQualifiersW(spelling, 2, qualifier, &qualifier_size, appdata, &appdata_size);
+@@ -3765,6 +3789,8 @@
+     DeleteFileW(path);
+     swprintf(path, ARRAY_SIZE(path), L"%s\\root\\Integration\\C2RManifest.Invalid.xml", root);
+     DeleteFileW(path);
++    swprintf(path, ARRAY_SIZE(path), L"%s\\root\\Integration\\C2RManifest.officemui.msi.16.ru-ru.xml", root);
++    DeleteFileW(path);
+     swprintf(path, ARRAY_SIZE(path), L"%s\\root\\Office16\\PROOF", root);
+     RemoveDirectoryW(path);
+     swprintf(path, ARRAY_SIZE(path), L"%s\\root\\Office16", root);
