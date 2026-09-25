@@ -87,6 +87,10 @@ jobs:
     needs: patches
     if: github.event_name == 'push' || inputs.architecture == 'x86_64'
     runs-on: ubuntu-24.04
+    env:
+      CCACHE_DIR: /home/runner/.cache/ccache
+      CCACHE_MAXSIZE: 2G
+      CCACHE_COMPRESS: 'true'
     outputs:
       archive_name: ${{ steps.identity.outputs.archive_name }}
       component_name: ${{ steps.identity.outputs.component_name }}
@@ -96,6 +100,14 @@ jobs:
 
     steps:        
       - uses: actions/checkout@v7
+
+      - name: restore compiler cache
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cache/ccache
+          key: soda-x86_64-ccache-${{ env.VALVE_WINE_COMMIT }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            soda-x86_64-ccache-${{ env.VALVE_WINE_COMMIT }}-
 
       - name: define build identity
         id: identity
@@ -207,6 +219,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: yes|./non-makepkg-build.sh
+
+      - name: compiler cache statistics
+        if: always()
+        run: |
+          if command -v ccache >/dev/null; then
+            ccache --show-stats
+          fi
 
       - name: verify packaged Unix runtime
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
