@@ -761,12 +761,25 @@ jobs:
     if: github.event_name == 'push' || inputs.architecture == 'aarch64'
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 360
+    env:
+      CCACHE_DIR: /home/runner/.cache/ccache
+      CCACHE_BASEDIR: /tmp/proton
+      CCACHE_MAXSIZE: 2G
+      CCACHE_COMPRESS: 'true'
     outputs:
       archive_name: ${{ steps.identity.outputs.archive_name }}
       component_name: ${{ steps.identity.outputs.component_name }}
 
     steps:
       - uses: actions/checkout@v7
+
+      - name: restore compiler cache
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cache/ccache
+          key: soda-aarch64-ccache-${{ env.PROTON_COMMIT }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            soda-aarch64-ccache-${{ env.PROTON_COMMIT }}-
 
       - name: define build identity
         id: identity
@@ -829,7 +842,7 @@ jobs:
         run: |
           mkdir /tmp/proton-build
           cd /tmp/proton-build
-          /tmp/proton/configure.sh --build-name=soda-arm64 --target-arch=arm64 --container-engine=docker
+          /tmp/proton/configure.sh --build-name=soda-arm64 --target-arch=arm64 --container-engine=docker --enable-ccache
 
       - name: build Wine and FEX
         working-directory: /tmp/proton-build
